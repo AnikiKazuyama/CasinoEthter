@@ -1,0 +1,41 @@
+.card-container {
+    width: 100%;
+    margin-right: 10px;
+    margin-bottom: 10px;
+}
+
+.card {
+    position: relative;
+    display: flex;
+    padding-top: 100%;
+    font-size: 24px;
+    background-color: #0095ff;
+    box-shadow: 5px 5px 10px -3px rgba(0, 0, 0, 0.5);
+    transition: 0.5s;
+}
+
+.card:hover {
+    box-shadow: 5px 5px 10px -1px rgba(0, 0, 0, 0.5);
+}
+
+.card__number {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+
+    transform: translate(-50%, -50%);
+
+    color: white
+}
+
+@media screen and ( min-width: 320px ) {
+    .card-container {
+        width: calc(50% - 10px);
+    }
+}
+
+@media screen and ( min-width: 776px ) { 
+    .card-container {
+        width: calc(25% - 10px);
+    }
+}

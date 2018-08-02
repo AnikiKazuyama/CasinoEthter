@@ -1,0 +1,16 @@
+.article {
+  font-size: 62;
+  text-align: center;
+  margin-bottom: 26px;
+}
+
+.cards-container {
+  display: flex;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  padding: 0 15px;
+}
+
+.main {
+  padding: 10px;
+}
