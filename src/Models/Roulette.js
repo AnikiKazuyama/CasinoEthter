@@ -4,6 +4,36 @@ import RouletteContract from '../../build/contracts/Rullete.json';
 class Roulette {
     constructor(instance) {
         this.casino = instance;
+        this.EndGameEvent = instance.GameEnd();
+    }
+
+    addPlayer = async (name, options) => {
+        await this.casino.addPlayer(name, { from: options.from });
+    }
+
+    checkAuth = async (address) => {
+        const isAuth = await this.casino.checkAuth({ from: address });
+        return isAuth;
+    }
+
+    startGame = async (options) => {
+        await this.casino.calculateWinner({ from: options.from }); 
+    }
+
+    bet = async (number, options) => {
+        await this.casino.bet(number, { from: options.from });
+    }
+
+    watchGameEnd(func) {
+        this.EndGameEvent.watch(( error, result ) => func(error, result));
+    }
+
+    stopWatchGameEnd() {
+        this.EndGameEvent.stopWatching();
+    }
+
+    isOwner = (options) => {
+        return  this.casino.isOwner.call({ from: options.from });
     }
 
     static async init() {

@@ -23,7 +23,7 @@ class Web3Provider {
 
     getUserAddress = async () => {
         const accounts = await this.getAccounts();
-
+        
         if(accounts.length) {
             return accounts[0];
         }

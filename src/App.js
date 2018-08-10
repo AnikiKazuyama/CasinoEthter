@@ -1,7 +1,7 @@
-import React, { Component } from 'react'
-import CasinoContract from '../build/contracts/Casino.json'
+import React, { Component, Fragment } from 'react'
 
 import Web3Provider from './utils/Web3Provider';
+import Roulette from './Models/Roulette';
 
 import Card from './components/Card';
 import EnterGameContainer from './containers/EnterGameContainer';
@@ -18,78 +18,99 @@ class App extends Component {
     this.state = {
       bet: '',
       inGame: false,
-      accounts: [],
-      CasinoInstance: null,
-      winingNumber: null,
-      web3: null
+      isOwner: false,
+      gameStatus: 'Waitnig',
+      winners: [],
+      winNumber: null,
     }
   }
 
-  async componentWillMount() {
-    this.instantiateContract();
-  }
-  
-  getAccounts = async () => {
-    const eth = await this.state.web3.eth;
-    await eth.getAccounts((error, accounts) => { this.setState({ accounts }); console.log(accounts) });
+  async componentDidMount() {
+    this.watchGameEnd();
+    await this.inGameCheck();
+    await this.isOwner();
   }
 
-  instantiateContract = async () => {
-    const web3 = await Web3Provider;
-
-    const contract = require('truffle-contract')
-    const Casino = contract(CasinoContract)
-
-    Casino.setProvider(await web3.getCurrentProvider())
-    return await Casino.deployed();
+  async componentWillUnmount() {
+    this.unSubscribeInGameCheck();
   }
 
   render() {
     return (
-      <main className="main">
-        <div className="main__inner">
-          <h1 className="article article--1">{ GREET }</h1>
-          { this.renderWiningNumber() }
-          { this.renderContent() }
-        </div> 
-      </main>
+      <Fragment>
+        <header className="header"><div className="container">{ GREET }</div></header>
+        <main className="main">
+          <div className="container">
+            { this.renderContent() }
+          </div> 
+        </main>
+      </Fragment>
     );
   }
 
+  // Start-Render-stuff
   renderContent() {
-    return this.state.inGame ? (
-      <div>
-        <input type='text' placeholder="Ваша ставка" value={ this.state.bet } onChange={ this.handleInputChange } ref={ (ref) => this.input = ref } />
-        <div className="cards-container">
-          { this.renderCards(NUMBER_OF_CARDS) }
-        </div>
-      </div>  
-    ) :
-        this.renderEnterTheGame();
+    if(this.state.inGame){
+      const button = <button onClick={ this.startGame }>Начать розыгрыш</button>; 
+     
+      return (
+        <div>
+          { this.state.isOwner ? button : null }
+          { this.renderEndGameInfo() }
+          <div className="cards-container">
+            { this.renderCards(NUMBER_OF_CARDS) }
+          </div>
+        </div>  
+      )
+    }  
+
+    return this.renderEnterTheGame();
+  }
+
+  renderEndGameInfo() {
+    if(this.state.gameStatus === "Ended") {
+      return (
+        <Fragment>
+          { this.renderWiningNumber() }
+          { this.renderWinners() }
+        </Fragment>
+      );
+    }
+
+    return null;
   }
 
   renderCards(numberOfCard) {
-  
     let cards = [];
 
     for (let i = 0; i < numberOfCard; i++) {
-      cards.push(<div className="card-container" key={ i }><Card onClick={ () => this.handleClick(i + 1) } number={ i + 1 }/></div>)
+      cards.push(<div className="card-container" key={ i }><Card onClick={ async () => await this.handleClick(i + 1) } number={ i + 1 }/></div>)
     }
 
     return cards;
   }
 
   renderEnterTheGame() {
-    return <EnterGameContainer/>
+    return <EnterGameContainer inGameCheck={ this.inGameCheck }/>
+  }
+
+  renderWinners = () => {
+    return this.state.winners.map((winer, index) => {
+      return <div key={ index }>Победители<span style={{ marginRight: '8px' }}>{ winer }</span></div>
+    });
   }
 
   renderWiningNumber() {
     const content = (
-      <p>Выигрышный номер - { this.state.winingNumber }</p>
+      <p>Выигрышный номер - { this.state.winNumber }</p>
     );
 
-    return this.state.winingNumber ? content : '';
+    return this.state.winNumber ? content : '';
   }
+
+  // End-Render-stuff
+
+  //Start-handling-inputs
 
   handleInputChange = (event) => {
     this.setState({
@@ -97,67 +118,71 @@ class App extends Component {
     })
   }
 
-  handleClick = (number) => {
-    this.bet(number)
+  handleClick = async (number) => {
+    await this.bet(number);
   }
 
-  bet = (number) => {
-    const web3 = this.state.web3; 
+  //End-handling-inputs
+  //Start-Game-action
+  startGame = async () => {
+    const web3 = await Web3Provider;
+    const roulette = await Roulette;
 
-    const CasinoInstance = this.state.CasinoInstance;
-    console.log(number);
-    CasinoInstance.bet(number, { from: this.state.accounts[0], value: web3.toWei(this.state.bet, 'ether'), gas: 771704 });
+    await roulette.startGame({ from: await web3.getUserAddress() });
+    this.setState({ gameStatus: 'Started' });
+  }
+  
+  bet = async (number) => {
+    const web3 = await Web3Provider;
+    const roulette = await Roulette;
+
+    await roulette.bet(number, { from: await web3.getUserAddress() });
+  }
+  //End-Game-action
+  //Start-Events
+  inGameCheck = async () => {
+    const web3 = await Web3Provider;
+    const roulette = await Roulette;
+
+    const userAddress = await web3.getUserAddress();
+    const inGame = await roulette.checkAuth( userAddress ); 
+  
+    this.setState({ inGame });
   }
 
-  contractBalance = async () => {
-    const contractBalance = await this.state.CasinoInstance.balanceOFCS.call();
+  watchGameEnd = async () => {
+    const roulette = await Roulette;
 
-    console.log(this.state.web3.fromWei(contractBalance.toString(), 'ether'));
+    roulette.watchGameEnd(this.onGameEnd);
+  }
+  
+  unSubscribeInGameCheck = async () => {
+    const roulette = await Roulette;
+    
+    roulette.stopWatchGameEnd();
   }
 
-  showPool = async () => {
-    const pool = await this.state.CasinoInstance.totalBet.call({from: this.state.accounts[0]});
-
-    console.log(this.state.web3.fromWei(pool, 'ether').toString());
-  }
-
-  showBets = async () => {
-    const bets = await this.state.CasinoInstance.numberOfBets.call({from: this.state.accounts[0]});
-
-    console.log(bets.toString())
-  }
-
-  getOwnerAddress = async () => {
-    const address = await this.state.CasinoInstance.getOwner.call(); 
-    console.log("Адрес хранителя контракта " + address.toString());
-  }
-
-  getPlayer = async () => {
-    const players = await this.state.CasinoInstance.getPlayer.call(0);
-
-    console.log(players);
-  }
-
-  getAccountInfo = async () => {
-    const accountAddress = this.state.accounts[0];
-    const accountInfo = await this.state.CasinoInstance.getPlayerInfo.call(accountAddress, { from: accountAddress });
-
-    console.log(accountInfo[0].toString(), accountInfo[1].toString());
-  }
-
-  start = async () => {
-    const CasinoInstance = this.state.CasinoInstance;
-
-    const winingNumber = await CasinoInstance.generateNumberWinner.call({ from: this.state.accounts[0], gas: 771704 });
-    await CasinoInstance.generateNumberWinner({ from: this.state.accounts[0], gas: 771704 })
+  onGameEnd = (error, result) => {
+    const { winners, winNumber } = result.args;
+  
     this.setState({
-      winingNumber: winingNumber.toString()
-    })
+      winners,
+      winNumber: winNumber.toString(), 
+      gameStatus: 'Ended'
+    });
   }
 
-  sendContractBalanceToOwner = async () => {
-    await this.state.CasinoInstance.sendContractBalanceToOwner({ from: this.state.accounts[0], gas: 771704 });
+  //End-Events
+  //Start-Common
+  isOwner = async () => {
+    const web3 = await Web3Provider;
+    const roulette = await Roulette;
+
+    const isOwner = await roulette.isOwner({ from: await web3.getUserAddress() });
+  
+    this.setState({ isOwner });
   }
+  //EndC-Common
 }
 
 export default App

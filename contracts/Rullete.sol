@@ -1,8 +1,12 @@
 pragma solidity ^0.4.24;
+import "./usingOraclize.sol";
 
-contract Rullete {
+contract Rullete is usingOraclize {
 
-  address owner; 
+  address owner;
+  
+  uint winNumber;
+
   uint public constant MAX_PLAYERS_COUNT = 2;
   address[] public playersId;
 
@@ -12,13 +16,23 @@ contract Rullete {
     uint bet;
     uint betTo;
   }
-    
+
+  enum GameStatuses { Waiting, Started, Ended }
+
+  GameStatuses status = GameStatuses.Waiting;
+
   mapping(address => Player) public players;
 
   constructor() public {
+    oraclize_setProof(proofType_Ledger);
     owner = msg.sender;
   }
 
+  //Start Oraclize callback
+  function __callback() {
+    
+  }
+  //End Oraclize callback
   // Modifiers starts
   modifier onlyOwner() {
     require(
@@ -48,7 +62,7 @@ contract Rullete {
   //Modifiers ends
 
   event PlayerEnter(string name);
-  event GameEnd(uint winNumber);
+  event GameEnd(uint winNumber, address[] winners);
   event GameStart();
 
   function addPlayer(string name) public {
@@ -82,7 +96,8 @@ contract Rullete {
     
   function calculateWinner() public onlyOwner returns(address[]) {
     emit GameStart();
-      
+    status = GameStatuses.Started;
+
     uint winNumber = winigNumber();
     uint winnersCount = countWinners(winNumber);
     
@@ -97,8 +112,8 @@ contract Rullete {
         }
     }
     
-    emit GameEnd(winNumber);
-    return winners;
+    status = GameStatuses.Ended;
+    emit GameEnd(winNumber, winners);
   }
     
   function bet(uint _betNumber) public onlyPlayer {
@@ -125,5 +140,17 @@ contract Rullete {
     }
 
     return isPlayer;
+  }
+
+  function getGameStatus() public view returns(GameStatuses) {
+    return status;
+  }
+
+  function isOwner() public view returns(bool) {
+    if(msg.sender == owner) {
+      return true;
+    } else {
+      return false;
+    }
   }
 }

@@ -26,18 +26,17 @@ export default class EnterGameContainer extends Component {
     }
 
     enterGame = async () => {
-        const roulette = Roulette;
+        const roulette = await Roulette;
         const name = this.state.name;
-
+        
         if(name) {
-            const web3 = Web3Provider;
-            const user = await web3.getUserAddress();
-            console.log(user);
-            // await roulette.addPlayer(name, { from: user, gas: 30000 });
-            this.toggleError();
-        }
+            const web3 = await Web3Provider;
+            const userAddress = await web3.getUserAddress();
+            console.log(userAddress)
+            await roulette.addPlayer(name, { from: userAddress });
 
-        this.toggleError();
+            await this.props.inGameCheck();
+        }
     }
 
     toggleError() {
@@ -49,7 +48,7 @@ export default class EnterGameContainer extends Component {
         });
     }
 
-    onNameInputChange = (name) => {
-        this.setState({ name });
+    onNameInputChange = (event) => {
+        this.setState({ name: event.target.value });
     }
 }
