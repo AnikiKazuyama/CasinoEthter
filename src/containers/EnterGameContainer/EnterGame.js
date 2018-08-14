@@ -2,7 +2,6 @@ import React, { Component } from 'react';
 
 import EnterGame from '../../components/EnderGame';
 
-
 import Web3Provider from '../../utils/Web3Provider';
 import Roulette from '../../Models/Roulette';
 
@@ -34,8 +33,6 @@ export default class EnterGameContainer extends Component {
             const userAddress = await web3.getUserAddress();
             console.log(userAddress)
             await roulette.addPlayer(name, { from: userAddress });
-
-            await this.props.inGameCheck();
         }
     }
 

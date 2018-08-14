@@ -1,12 +1,29 @@
+body {
+  margin: 0px;
+}
+
 .article {
   font-size: 62;
   text-align: center;
   margin-bottom: 26px;
 }
 
-.cards-container {
+.container {
   display: flex;
   justify-content: flex-start;
   flex-wrap: wrap;
   padding: 0 15px;
+}
+
+.container--col {
+  flex-direction: column;
+}
+
+.container__item {
+  margin-right: 10px;
+  margin-left: 10px;
+}
+
+.text--center {
+  text-align: center;
 }

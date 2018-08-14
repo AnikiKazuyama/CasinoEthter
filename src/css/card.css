@@ -1,7 +1,4 @@
 .card-container {
-    width: calc(100% - 20px);
-    margin-right: 10px;
-    margin-left: 10px;
     margin-bottom: 10px;
 }
 
@@ -31,12 +28,12 @@
 
 @media screen and ( min-width: 320px ) {
     .card-container {
-        width: calc(50% - 20px);
+        width: calc(25% - 20px);
     }
 }
 
 @media screen and ( min-width: 776px ) { 
     .card-container {
-        width: calc(25% - 20px);
+        width: calc(20% - 20px);
     }
 }

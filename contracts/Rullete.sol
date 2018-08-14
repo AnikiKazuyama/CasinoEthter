@@ -1,44 +1,55 @@
 pragma solidity ^0.4.24;
-import "./usingOraclize.sol";
+import  "installed_contracts/oraclize-api/contracts/usingOraclize.sol";
 
 contract Rullete is usingOraclize {
 
   address owner;
-  
-  uint winNumber;
 
-  uint public constant MAX_PLAYERS_COUNT = 2;
+  string winNumber;
+
+  uint numberOfBets;
+  uint pool;
+
+  uint public constant MAX_PLAYERS_COUNT = 4;
+  uint public constant MIN_BET = 200 finney;
+
   address[] public playersId;
 
   struct Player {
     string name;
     bool voted;
-    uint bet;
-    uint betTo;
+    string bet;
+    string betTo;
   }
 
   enum GameStatuses { Waiting, Started, Ended }
 
   GameStatuses status = GameStatuses.Waiting;
 
+  mapping(string => address[]) betToPlayers;
+
   mapping(address => Player) public players;
 
-  constructor() public {
-    oraclize_setProof(proofType_Ledger);
+  constructor() public payable {
+    OAR = OraclizeAddrResolverI(0x6f485C8BF6fc43eA212E93BBF8ce046C7f1cb475);
     owner = msg.sender;
   }
 
-  //Start Oraclize callback
-  function __callback() {
-    
-  }
-  //End Oraclize callback
   // Modifiers starts
   modifier onlyOwner() {
     require(
         owner == msg.sender, 
         "Вы не владелец контракта"
     );
+    _;
+  }
+
+  modifier onlyWaiting() {
+    require(
+      status == GameStatuses.Waiting, 
+      "Игра уже началась, вы не можете сделать ставку"
+    );
+
     _;
   }
 
@@ -59,11 +70,31 @@ contract Rullete is usingOraclize {
 
      _;
   }
+
+  modifier allPlayersDidBets() {
+    require(
+      numberOfBets == playersId.length, 
+      "Не все люди сделали ставку"
+    );
+
+    _;
+  }
+
+  modifier minBet() {
+    require(
+      msg.value > MIN_BET, 
+      "Ваша ставка меньше минимальной"
+    );
+
+    _;
+  }
+
   //Modifiers ends
 
   event PlayerEnter(string name);
-  event GameEnd(uint winNumber, address[] winners);
+  event GameEnd(string winNumber, address[] winners);
   event GameStart();
+  event Log(string currentBalance);
 
   function addPlayer(string name) public {
     require(
@@ -72,53 +103,72 @@ contract Rullete is usingOraclize {
     );
     
     playersId.push(msg.sender);
-    players[msg.sender] = Player(name, false, 0, 0);
+    players[msg.sender] = Player(name, false, "0", "0");
 
     emit PlayerEnter(name);
   }
-  
-  function winigNumber() pure internal 
-      returns(uint) {
-    return 2;
+
+ function __callback(
+    bytes32 _queryId,
+    string _result
+  ) {
+    emit Log(_result);
+    // Checks that the sender of this callback was in fact oraclize
+    require(msg.sender == oraclize_cbAddress(), "Это не оракловский адрес");
+
+    emit GameEnd(_result, betToPlayers[_result]);
   }
     
-  function countWinners(uint winNumber) public view returns(uint){
-    uint winnersCount = 0;
+  function calculateWinner() 
+    public
+    payable
+    onlyOwner
+    allPlayersDidBets
+    returns(address[]) {
     
-    for(uint i = 0; i < playersId.length; i++) {
-        if(winNumber == players[playersId[i]].betTo){
-            winnersCount++;
-        }
-    }
-    
-    return winnersCount;
-  }
-    
-  function calculateWinner() public onlyOwner returns(address[]) {
     emit GameStart();
     status = GameStatuses.Started;
 
-    uint winNumber = winigNumber();
-    uint winnersCount = countWinners(winNumber);
-    
-    uint winIteration = 0;
-    
-    address[] memory winners = new address[](winnersCount);
-    
-    for(uint i = 0; i < playersId.length; i++) {
-        if(winNumber == players[playersId[i]].betTo){
-            winners[winIteration] = playersId[i];
-            winIteration++;
-        }
-    }
-    
+    require(
+      playersId.length != 0, 
+      "Нету игроков"
+    );
+
+    require(
+      oraclize_getPrice("URL") < msg.value,
+      "Недостаточно средств на контракте"
+    );
+
+    oraclize_query("URL", "json(https://api.random.org/json-rpc/1/invoke).result.random.data.0", '\n{"jsonrpc":"2.0","method":"generateIntegers","params":{"apiKey":"c4c35f5a-5641-4344-9d60-0c2c613d2505","n":1,"min":1,"max":10,"replacement":true,"base":10},"id":1}');
+
     status = GameStatuses.Ended;
-    emit GameEnd(winNumber, winners);
+
+    status = GameStatuses.Waiting;
   }
+
+  function toString(address x) returns (string) {
+    bytes memory b = new bytes(20);
+    for (uint i = 0; i < 20; i++)
+        b[i] = byte(uint8(uint(x) / (2**(8*(19 - i)))));
+    return string(b);
+  }
+
+  function bet(string _betNumber) 
+    public
+    payable 
+    onlyWaiting 
+    onlyPlayer 
+    minBet {
+
+    emit Log(_betNumber);
+    betToPlayers[_betNumber].push(msg.sender);
     
-  function bet(uint _betNumber) public onlyPlayer {
+    pool = pool + msg.value;
+
     players[msg.sender].betTo = _betNumber;
     players[msg.sender].voted = true;
+
+    numberOfBets++;
   }
   
   function getPalyersCount() public view returns(uint){
@@ -153,4 +203,25 @@ contract Rullete is usingOraclize {
       return false;
     }
   }
+
+  function stringToUint(string s) constant returns (uint result) {
+    bytes memory b = bytes(s);
+    uint i;
+    result = 0;
+    for (i = 0; i < b.length; i++) {
+        uint c = uint(b[i]);
+        if (c >= 48 && c <= 57) {
+            result = result * 10 + (c - 48);
+        }
+    }
+  }
+
+  function getPlayerByBet(string betNumber) returns(address[]) {
+    return betToPlayers[betNumber];
+  }
+
+  function getBet() returns(string) {
+    return players[msg.sender].betTo;
+  }
+
 }
