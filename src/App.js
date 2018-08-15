@@ -6,6 +6,8 @@ import Roulette from './Models/Roulette';
 import Card from './components/Card';
 import EnterGameContainer from './containers/EnterGameContainer';
 
+import randomInt from './utils/randomInt';
+
 import './App.css'
 import './css/header.css';
 import './css/gameMasterInfo.css';
@@ -21,24 +23,17 @@ class App extends Component {
 
     this.state = {
       bet: '',
-      inGame: false,
+      inGame: true,
       isOwner: false,
       gameStatus: 'Waitnig',
       winners: [],
       winNumber: null,
-      owner: '', 
+      owner: '',
       etherBet: 0
     }
   }
 
   async componentDidMount() {
-    this.watchGameEnd();
-    this.watchLogs();
-
-    await this.getPlayersCount();
-    await this.inGameCheck();
-    await this.isOwner();
-    await this.getBet();
   }
 
   async componentWillUnmount() {
@@ -46,6 +41,8 @@ class App extends Component {
   }
 
   render() {
+    // console.log(this.state.inGame);
+
     return (
       <Fragment>
         <header className="header"><div className="header__title text--center">{ GREET }</div></header>
@@ -59,7 +56,7 @@ class App extends Component {
 
   // Start-Render-stuff
   renderContent() {
-    if(this.state.inGame) {     
+    if(this.state.inGame) {
       return (
         <div className="content">
           { this.renderEndGameInfo() }
@@ -99,10 +96,8 @@ class App extends Component {
     return (
       <div className="game-info container container--col">
         <div className="game-info__title container__item">Информация о игре</div>
-        { this.renderPlayersCount() }
         { this.renderWiningNumber() }
         { this.renderUserBet() }
-        { this.renderWinners() }
       </div>
     );
   }
@@ -119,29 +114,6 @@ class App extends Component {
 
   renderEnterTheGame() {
     return <EnterGameContainer inGameCheck={ this.inGameCheck }/>
-  }
-
-  renderWinners = () => {
-    if(this.state.gameStatus === "Ended") {
-        return (
-          <ul className="winners-list container__item">
-            <div className="winners-list__title">Победители:</div>
-            { this.winners() }
-          </ul>
-        );
-    }
-
-    return null;
-  }
-
-  winners() {
-    return this.state.winners.map((winer, index) => {
-      return <li className="winners-list__item" key={ index }>{ winer }</li>
-    });
-  }
-
-  renderPlayersCount = () => {
-    return <div className="container__item">Количество игроков: { this.state.playersCount }</div>
   }
 
   renderWiningNumber() {
@@ -177,17 +149,27 @@ class App extends Component {
   }
 
   handleClick = async (number) => {
-    await this.bet(number);
+    this.setState({ 
+      bet: number,
+     });
   }
 
   //End-handling-inputs
   //Start-Game-action
   startGame = async () => {
-    const web3Instance = await Web3Provider;
+    const web3Inst = await Web3Provider;
     const roulette = await Roulette;
-    
-    await roulette.startGame({ from: await web3Instance.getUserAddress(), value: web3Instance.web3.toWei(0.5, "ether") });
+
     this.setState({ gameStatus: 'Started' });
+  
+    const etherBet = this.state.etherBet;
+
+    const bet = this.state.bet;
+    const winNumber = randomInt(1, 2);
+    
+    const isUserWin = bet == winNumber ? true : false;
+
+    roulette.tranferToWInner(isUserWin, { from: await web3Inst.getUserAddress(), value: etherBet });
   }
   
   bet = async (number) => {
@@ -197,77 +179,22 @@ class App extends Component {
     await roulette.bet(number, { from: await web3.getUserAddress(), value: web3.web3.toWei(this.state.etherBet, "ether") });
   }
 
+  enterGame = async () => {
+    const roulette = await Roulette;
+    const name = "";
+    
+    const web3 = await Web3Provider;
+    const userAddress = await web3.getUserAddress();
+    // console.log(userAddress)
+    await roulette.addPlayer(name, { from: userAddress });
+}
 
   //End-Game-action
   //Start-Events
-  inGameCheck = async () => {
-    const web3 = await Web3Provider;
-    const roulette = await Roulette;
-
-    const userAddress = await web3.getUserAddress();
-    const inGame = await roulette.checkAuth( userAddress ); 
-  
-    this.setState({ inGame });
-  }
-
-  watchGameEnd = async () => {
-    const roulette = await Roulette;
-
-    roulette.watchGameEnd(this.onGameEnd);
-  }
-  
-  unSubscribeInGameCheck = async () => {
-    const roulette = await Roulette;
-    
-    roulette.stopWatchGameEnd();
-  }
-
-  watchLogs = async () => {
-    const roulette = await Roulette; 
-
-    roulette.watchLogs();
-  }
-
-  getPlayersCount = async () => {
-    const web3 = await Web3Provider;
-    const roulette = await Roulette;
-
-    const playersCount = await roulette.playersCount({ from: await web3.getUserAddress() });
-
-    this.setState({
-      playersCount: playersCount.toString()
-    });
-  }
-
-  getBet = async () => {
-    const web3 = await Web3Provider;
-    const roulette = await Roulette;
-
-    const bet = await roulette.getBet({ from: await web3.getUserAddress() });
-    
-    this.setState({ bet });
-  }
-
-  onGameEnd = (error, result) => {
-    const { winners, winNumber } = result.args;
-  
-    this.setState({
-      winners,
-      winNumber: winNumber.toString(), 
-      gameStatus: 'Ended'
-    });
-  }
 
   //End-Events
   //Start-Common
-  isOwner = async () => {
-    const web3 = await Web3Provider;
-    const roulette = await Roulette;
 
-    const isOwner = await roulette.isOwner({ from: await web3.getUserAddress() });
-  
-    this.setState({ isOwner });
-  }
   //EndC-Common
 }
 
